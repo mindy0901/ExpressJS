@@ -1,12 +1,9 @@
 const express = require('express');
 const app = express();
-const dotenv = require('dotenv');
-dotenv.config();
 const cookieParser = require('cookie-parser');
 const logger = require('morgan');
 const cors = require('cors');
 
-const verifyJWT = require('./middlewares/verifyJWT');
 const credentials = require('./middlewares/credentials');
 const corsOptions = require('./config/corsOptions');
 
@@ -33,7 +30,7 @@ app.use(cookieParser());
 
 // routes
 app.use('/auth', authRoute);
-app.use(verifyJWT);
+
 app.use('/api/users', usersRoute);
 
 app.listen(process.env.PORT || 8000, () => {

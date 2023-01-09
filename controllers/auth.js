@@ -1,31 +1,36 @@
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
 require('dotenv').config();
-
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcrypt');
+const CryptoJS = require('crypto-js');
+const { validationResult } = require('express-validator');
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 const signup = async (req, res) => {
-    const { username, password, email, role } = req.body;
+    // 1 validate signup request
+    const errors = validationResult(req);
 
-    // 1 check required field
-    if (!username || !password || !email)
-        return res.status(400).json({ message: 'Username, Password and Email are required.' });
+    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
     // 2 check for duplicate username or email in the database
+    const { username, password, email, role } = req.body;
+
     const duplicateName = await prisma.user.findUnique({
         where: { username: username },
     });
+
     if (duplicateName) return res.status(409).json({ message: 'Username already exists' });
 
     const duplicateEmail = await prisma.user.findUnique({
         where: { email: email },
     });
+
     if (duplicateEmail) return res.status(409).json({ message: 'Email already exists' });
 
     // 3 create user
     try {
         const hashedPassword = await bcrypt.hash(password, 10);
+
         const data = {
             username: username,
             email: email,
@@ -36,19 +41,24 @@ const signup = async (req, res) => {
         const newUser = await prisma.user.create({
             data: data,
         });
-        res.status(201).json(newUser);
+
+        delete newUser.password;
+
+        return res.status(201).json(newUser);
     } catch (err) {
-        res.status(500).json({ message: err.message });
+        return res.status(500).json({ message: err.message });
     }
 };
 
 const signin = async (req, res) => {
-    const { username, password } = req.body;
+    // 1 validate signin request
+    const errors = validationResult(req);
 
-    // 1 check required field
-    if (!username || !password) return res.status(400).json({ message: 'Username and Password are required.' });
+    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
     // 2 find user in database
+    const { username, password } = req.body;
+
     const user = await prisma.user.findUnique({
         where: { username: username },
     });
@@ -57,68 +67,98 @@ const signin = async (req, res) => {
 
     // 3 check password
     const isMatch = await bcrypt.compare(password, user.password);
+
     if (!isMatch) return res.status(401).json({ message: 'Password does not match' });
 
     // 4 assign token
     const access_token = jwt.sign({ id: user.id, role: user.role }, process.env.ACCESS_TOKEN_SECRET, {
-        expiresIn: '10m',
+        expiresIn: '8h',
     });
-    const refresh_token = jwt.sign({ id: user.id, role: user.role }, process.env.REFRESH_TOKEN_SECRET, {
-        expiresIn: '1d',
+    const refresh_token = jwt.sign({ id: user.id }, process.env.REFRESH_TOKEN_SECRET, {
+        expiresIn: '24h',
     });
 
     // 5 pass access_token to
-    res.cookie('access_token', access_token, {
-        httpOnly: true,
-        sameSite: 'None',
-        maxAge: 1 * 60 * 60 * 1000,
+    res.header('Authorization', `Bearer ${access_token}`);
+    res.header('Access-Control-Expose-Headers', 'Authorization');
+
+    const encryptedRefreshToken = CryptoJS.AES.encrypt(refresh_token, process.env.CRYPTO_KEY).toString();
+
+    await prisma.user.update({
+        where: { username: username },
+        data: { refresh_token: encryptedRefreshToken },
     });
 
-    res.cookie('refresh_token', refresh_token, {
-        httpOnly: true,
-        sameSite: 'None',
-        maxAge: 24 * 60 * 60 * 1000,
-    });
-
-    const exclude = (user, keys) => {
-        for (let key of keys) {
-            delete user[key];
-        }
-        return user;
-    };
-    const userWithoutPassword = exclude(user, ['password']);
-
-    res.status(200).json(userWithoutPassword);
+    return res.status(200).json({ message: `You're in ${username}` });
 };
 
 const signout = async (req, res) => {
-    res.clearCookie('access_token', { httpOnly: true, sameSite: 'None' });
-    res.clearCookie('refresh_token', { httpOnly: true, sameSite: 'None' });
-    return res.status(200).json({ message: 'Signout successful' });
+    try {
+        await prisma.user.update({
+            where: { id: req.userId },
+            data: { refresh_token: '' },
+        });
+
+        res.header('Authorization', '');
+        res.header('Access-Control-Expose-Headers', 'Authorization');
+
+        return res.status(200).json({ message: 'Signout successful' });
+    } catch (error) {
+        return res.status(200).json({ message: 'Signout failed' });
+    }
 };
 
 const refreshToken = async (req, res) => {
-    // 1 get cookies
-    const cookies = req.cookies;
-    if (!cookies?.refresh_token) return res.status(401).json({ message: 'Refresh token not found' });
+    // 1 get refresh token from request
+    const refreshToken = req?.body?.refresh_token;
 
-    // 2 verify refresh_token
-    jwt.verify(cookies.refresh_token, process.env.REFRESH_TOKEN_SECRET, async (err, decoded) => {
-        if (err) return res.status(403).json({ message: 'Error when verifying token' });
-        const user = await prisma.user.findUnique({ where: { id: decoded.id } });
-        if (!user) return res.status(403).json({ message: 'No user found for this refresh token' });
+    if (!refreshToken) res.status(403).json({ message: 'Refresh token not found' });
 
-        const access_token = jwt.sign({ id: user.id, role: user.role }, process.env.ACCESS_TOKEN_SECRET, {
-            expiresIn: '10m',
-        });
+    // 2 decrypt refresh token
+    const bytes = CryptoJS.AES.decrypt(refreshToken, process.env.CRYPTO_KEY);
 
-        res.cookie('access_token', access_token, {
-            httpOnly: true,
-            sameSite: 'None',
-            maxAge: 1 * 60 * 60 * 1000,
-        });
-        res.status(200).json({ message: 'Token refresh succesful' });
+    const decryptedRefreshToken = bytes?.toString(CryptoJS.enc.Utf8);
+
+    if (!decryptedRefreshToken) res.status(403).json({ message: 'Refresh token decryption failed' });
+
+    // 3 verify refresh token expired time, get user info
+    let userId;
+
+    jwt.verify(decryptedRefreshToken, process.env.REFRESH_TOKEN_SECRET, (err, decoded) => {
+        if (err) res.status(403).json({ message: err.message[0].toUpperCase() + err.message.substring(1) });
+
+        userId = decoded.id;
     });
+
+    // 4 find user in database by user info
+    const user = await prisma.user.findUnique({
+        where: { id: userId },
+    });
+
+    if (!user) res.status(403).json({ message: 'User not found, refresh token failed' });
+
+    if (user.refresh_token !== refreshToken) res.status(403).json({ message: 'Refresh token does not match' });
+
+    // 5 create new access & refresh token
+    const access_token = jwt.sign({ id: user.id, role: user.role }, process.env.ACCESS_TOKEN_SECRET, {
+        expiresIn: '8h',
+    });
+
+    const refresh_token = jwt.sign({ id: user.id }, process.env.REFRESH_TOKEN_SECRET, { expiresIn: '24h' });
+
+    // 6 encrypt refresh token and update user in database
+    const encryptedRefreshToken = CryptoJS.AES.encrypt(refresh_token, process.env.CRYPTO_KEY).toString();
+
+    await prisma.user.update({
+        where: { id: user.id },
+        data: { refresh_token: encryptedRefreshToken },
+    });
+
+    // 7 replace access token at response headers
+    res.header('Authorization', `Bearer ${access_token}`);
+    res.header('Access-Control-Expose-Headers', 'Authorization');
+
+    res.status(200).json(encryptedRefreshToken);
 };
 
 module.exports = { signup, signin, signout, refreshToken };

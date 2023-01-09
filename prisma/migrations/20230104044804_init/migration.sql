@@ -1,11 +1,11 @@
 -- CreateEnum
-CREATE TYPE "Role" AS ENUM ('USER', 'ADMIN');
+CREATE TYPE "Role" AS ENUM ('DIRECTOR', 'ADMIN', 'MANAGER', 'USER');
 
 -- CreateTable
 CREATE TABLE "Post" (
     "id" SERIAL NOT NULL,
-    "title" VARCHAR(255) NOT NULL,
-    "content" TEXT,
+    "title" TEXT NOT NULL,
+    "content" TEXT NOT NULL,
     "isPublish" BOOLEAN NOT NULL DEFAULT false,
     "authorId" INTEGER NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -17,14 +17,19 @@ CREATE TABLE "Post" (
 -- CreateTable
 CREATE TABLE "User" (
     "id" SERIAL NOT NULL,
-    "name" TEXT NOT NULL,
+    "username" TEXT NOT NULL,
     "email" TEXT NOT NULL,
+    "password" TEXT NOT NULL,
     "role" "Role" NOT NULL DEFAULT 'USER',
+    "refresh_token" TEXT NOT NULL DEFAULT '',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "User_pkey" PRIMARY KEY ("id")
 );
+
+-- CreateIndex
+CREATE UNIQUE INDEX "User_username_key" ON "User"("username");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
