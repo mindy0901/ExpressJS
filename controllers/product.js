@@ -8,6 +8,7 @@ const getProducts = async (req, res) => {
                 createdAt: 'desc',
             },
         });
+
         return res.status(200).json(products);
     } catch (error) {
         return res.status(403).json({ message: 'Get products failed' });
@@ -17,7 +18,6 @@ const getProducts = async (req, res) => {
 const createProduct = async (req, res) => {
     const product = req.body;
 
-    console.log(product);
     try {
         const newProduct = await prisma.product.create({
             data: product,
