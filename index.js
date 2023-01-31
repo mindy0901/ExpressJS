@@ -2,9 +2,6 @@ const express = require('express');
 const app = express();
 const http = require('http');
 const server = http.createServer(app);
-const socketIo = require('socket.io')(server, {
-    cors: { origin: '*' },
-});
 const compression = require('compression');
 const cookieParser = require('cookie-parser');
 const logger = require('morgan');
@@ -44,17 +41,6 @@ app.use(logErrors);
 app.use(clientErrorHandler);
 app.use(errorHandler);
 
-socketIo.on('connection', (socket) => {
-    console.log('New client connected ' + socket.id);
-
-    socket.on('ping', () => {
-        socketIo.emit('pong');
-    });
-
-    socket.on('disconnect', () => {
-        console.log('Client disconnected');
-    });
-});
 // routes
 app.use('/auth', authRoute);
 
