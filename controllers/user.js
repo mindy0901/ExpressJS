@@ -7,7 +7,7 @@ const getUsers = async (req, res) => {
 
     if (!ability.can(Actions.ReadAll, 'User'))
         return res.status(403).json({ message: 'Permission denied - read all user' });
-    
+
     try {
         const users = await prisma.user.findMany({
             orderBy: {
@@ -24,27 +24,27 @@ const getUsers = async (req, res) => {
 const getUser = async (req, res) => {
     const id = req.params.id;
 
-    if (id === 'me') {
-        const user = await prisma.user.findUnique({
-            where: { id: req.userId },
-        });
+    const user = await prisma.user.findUnique({
+        where: { id: parseInt(id) },
+    });
 
-        if (!user) return res.status(404).json({ message: 'User not found' });
+    if (!user) return res.status(404).json({ message: 'User not found' });
 
-        delete user.password;
+    delete user.password;
 
-        return res.status(200).json(user);
-    } else {
-        const user = await prisma.user.findUnique({
-            where: { id: parseInt(id) },
-        });
+    return res.status(200).json(user);
+};
 
-        if (!user) return res.status(404).json({ message: 'User not found' });
+const getMe = async (req, res) => {
+    const user = await prisma.user.findUnique({
+        where: { id: req.userId },
+    });
 
-        delete user.password;
+    if (!user) return res.status(404).json({ message: 'User not found' });
 
-        return res.status(200).json(user);
-    }
+    delete user.password;
+
+    return res.status(200).json(user);
 };
 
 const updateUser = async (id, form, user) => {
@@ -97,4 +97,4 @@ const deleteUser = async (id, user) => {
     }
 };
 
-module.exports = { getUser, getUsers };
+module.exports = { getUser, getUsers, getMe };

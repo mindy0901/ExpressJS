@@ -10,6 +10,16 @@ datasource db {
     url      = env("DATABASE_URL")
 }
 
+model Product {
+    id             Int      @id @default(autoincrement())
+    productName    String
+    productPrice   String
+    productColor   String
+    productQuality String
+    createdAt      DateTime @default(now())
+    updatedAt      DateTime @updatedAt
+}
+
 model Post {
     id        Int      @id @default(autoincrement())
     title     String

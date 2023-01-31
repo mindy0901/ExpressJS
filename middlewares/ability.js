@@ -6,7 +6,7 @@ const Actions = {
 
     Read: 'read',
     ReadAll: 'readAll',
-    ReadPublicOnly: 'readAllPublish',
+    ReadPublicOnly: 'readPublicOnly',
 
     Update: 'update',
     Delete: 'delete',
