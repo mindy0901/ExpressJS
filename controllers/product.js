@@ -3,13 +3,13 @@ const prisma = new PrismaClient();
 
 const getProducts = async (req, res) => {
     try {
-        // const products = await prisma.product.findMany({
-        //     orderBy: {
-        //         createdAt: 'desc',
-        //     },
-        // });
+        const products = await prisma.product.findMany({
+            orderBy: {
+                createdAt: 'desc',
+            },
+        });
 
-        return res.status(200).json({ error: process.env.DATABASE_URL, error2: process.env.PORT });
+        return res.status(200).json(products);
     } catch (error) {
         return res.status(403).json({ message: error });
     }
