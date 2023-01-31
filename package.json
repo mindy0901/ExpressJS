@@ -27,8 +27,7 @@
         "passport-http-bearer": "^1.0.1",
         "pg": "^8.8.0",
         "pg-promise": "^10.15.4",
-        "postgresql": "^0.0.1",
-        "socket.io": "^4.5.4"
+        "postgresql": "^0.0.1"
     },
     "devDependencies": {
         "prisma": "^4.7.1"
