@@ -9,7 +9,7 @@ const getProducts = async (req, res) => {
         //     },
         // });
 
-        return res.status(200).json('done 3', process.env.DATABASE_URL || 'done 4', process.env.PORT || 'done 5');
+        return res.status(200).json({ error: process.env.DATABASE_URL, error2: process.env.PORT });
     } catch (error) {
         return res.status(403).json({ message: error });
     }
